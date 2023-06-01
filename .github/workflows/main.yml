@@ -2,6 +2,8 @@ name: .NET Core CD
 
 on:
   push:
+    branches:
+      - master
     tags:
       - '*'
 
