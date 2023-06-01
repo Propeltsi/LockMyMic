@@ -1,52 +1,59 @@
-name: .NET Core CD
+name: .NET Build and Release
 
 on:
   push:
     branches:
       - master
-    tags:
-      - '*'
 
 jobs:
-  build:
-
+  build-and-release:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - name: Check out code
+      uses: actions/checkout@v2
 
-    - name: Setup .NET Core
+    - name: Setup .NET
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: 7.0.x
+        dotnet-version: '7.0.x'
 
-    - name: Install dependencies
+    - name: Restore dependencies
       run: dotnet restore
 
     - name: Build
-      run: dotnet build --configuration Release --no-restore
+      run: dotnet build --no-restore
+
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
 
     - name: Publish
-      run: dotnet publish --configuration Release --no-build --output ./publish
+      run: dotnet publish --no-build --configuration Release --output ./published
 
-    - name: Create Release
+    - name: Create Release Tag
+      id: create_tag
+      run: |
+        echo "RELEASE_VERSION=LockMyMic-$(date +'%Y%m%d%H%M%S')" >> $GITHUB_ENV
+        git config --global user.email "action@github.com"
+        git config --global user.name "GitHub Action"
+        git tag $RELEASE_VERSION
+        git push origin $RELEASE_VERSION
+
+    - name: Create GitHub Release
       id: create_release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
+        tag_name: ${{ env.RELEASE_VERSION }}
+        release_name: Release ${{ env.RELEASE_VERSION }}
 
-    - name: Upload Release Asset
-      id: upload-release-asset
+    - name: Upload Artifacts to Release
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./publish/LockMyMic.exe
+        asset_path: ./published/LockMyMic.exe
         asset_name: LockMyMic.exe
         asset_content_type: application/octet-stream
